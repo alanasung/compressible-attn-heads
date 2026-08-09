@@ -1,6 +1,6 @@
-# Deploying Programmatic Attention in Transformers
+# Replacing Attention Heads With Programs You Can Actually Delete
 
-**Target project.** Deploying Programmatic Attention in Real Transformers
+**Target project.** Replacing Attention Heads With Programs You Can Actually Delete
 **Research areas.** Mechanistic interpretability
 
 ## Summary

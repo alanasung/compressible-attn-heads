@@ -1,14 +1,14 @@
-# Design Document: Substitutability Ladder for Programmatic QK Circuits
+# Design Document: Replacing Attention Heads With Programs You Can Actually Delete
 
 ## 1. Purpose
 
-This document is the method contract for **Substitutability Ladder for Programmatic QK Circuits**. It specifies what is
+This document is the method contract for **Replacing Attention Heads With Programs You Can Actually Delete**. It specifies what is
 measured, how measurement is instrumented, which artifacts are produced, and
 which claims are out of scope for the pilot profile.
 
 One-liner: Rank every attention head by how cheaply it can be replaced with a hand-written program, then make that substitution survive training.
 
-Hypothesis: Head substitutability is heavy-tailed and predictable, and more importantly it survives deployment: heads identified as substitutable can have their Q and K projections physically deleted and be retrained with a fixed programmatic pattern, recovering most of the perplexity cost that hard post-hoc substitution incurs, while genuinely reducing parameters rather than merely masking a still-computed pattern.
+Hypothesis: Many attention heads are well approximated by short programs; the interesting claim is whether those programs can replace Q/K compute rather than merely mask it.
 
 ## 2. Scope
 

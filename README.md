@@ -1,15 +1,15 @@
 <p align="center">
-  <h1 align="center">Deploying Programmatic Attention in Transformers</h1>
-  <p align="center"><strong>Rank heads by substitutability with hand-written programs, then surgically install those programs for real efficiency gains.</strong></p>
+  <h1 align="center">Replacing Attention Heads With Programs You Can Actually Delete</h1>
+  <p align="center"><strong>Find heads whose patterns match simple programs, then surgically remove their Q/K weights and keep the model usable.</strong></p>
   </p>
 
 ---
 
 ## Overview
 
-This repository implements experimental profiles for **Deploying Programmatic Attention in Transformers**. Config, caching, hooks, metrics, ablations, reporting, and CI are built for reproducible local pilots on small open-weight models.
+This repository implements experimental profiles for **Replacing Attention Heads With Programs You Can Actually Delete**. Config, caching, hooks, metrics, ablations, reporting, and CI are built for reproducible local pilots on small open-weight models.
 
-Hypothesis (one line): Head substitutability is heavy-tailed and predictable, and more importantly it survives deployment: heads identified as substitutable can have their Q and K projections physically deleted and be retrained with a fixed programmatic pattern, recovering most of the perplexity cost that hard post-hoc substitution incurs, while genuinely reducing parameters rather than merely masking a still-computed pattern.
+Hypothesis (one line): Many attention heads are well approximated by short programs; the interesting claim is whether those programs can replace Q/K compute rather than merely mask it.
 
 ## Motivation
 
@@ -86,8 +86,8 @@ registry and must pass the harness-validation script before any measured claim.
 ## Citation
 
 ```bibtex
-@misc{programmatic_attention_pilot,
-  title        = {Deploying Programmatic Attention in Transformers},
+@misc{deletable_program_heads,
+  title        = {Replacing Attention Heads With Programs You Can Actually Delete},
   author       = {Alana Sung},
   year         = {2026},
   howpublished = {Technical report},

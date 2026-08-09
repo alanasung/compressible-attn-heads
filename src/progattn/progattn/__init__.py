@@ -1,4 +1,4 @@
-"""Substitutability Ladder for Programmatic QK Circuits."""
+"""Replacing Attention Heads With Programs You Can Actually Delete."""
 
 from .patterns import PROGRAMS, generate_pattern
 

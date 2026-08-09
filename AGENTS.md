@@ -3,7 +3,7 @@
 See [CLAUDE.md](CLAUDE.md) for the full build instructions; this file exists so
 that agents which look for `AGENTS.md` find the same context.
 
-Project: Substitutability Ladder for Programmatic QK Circuits
+Project: Replacing Attention Heads With Programs You Can Actually Delete
 Package: `src/progattn`
 Entry point: `python -m progattn --help`
 

@@ -1,4 +1,4 @@
-# TASK.md — Substitutability Ladder for Programmatic QK Circuits
+# TASK.md — Replacing Attention Heads With Programs You Can Actually Delete
 
 ID convention: `I##` infrastructure, `D##` data, `M##` modelling / hooks,
 `E##` experiments, `A##` ablations, `S##` sweeps, `R##` reporting.

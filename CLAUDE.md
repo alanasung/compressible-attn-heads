@@ -4,7 +4,7 @@ Context for coding agents working in this repository.
 
 ## What this is
 
-Research implementation of "Deploying Programmatic Attention in Transformers".
+Research implementation of "Replacing Attention Heads With Programs You Can Actually Delete".
 
 ## Hard constraints
 

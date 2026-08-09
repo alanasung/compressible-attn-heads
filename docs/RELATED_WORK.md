@@ -1,6 +1,6 @@
 # Related work
 
-This note situates **Deploying Programmatic Attention in Transformers** against related literature.
+This note situates **Replacing Attention Heads With Programs You Can Actually Delete** against related literature.
 
 ## Positioning
 
