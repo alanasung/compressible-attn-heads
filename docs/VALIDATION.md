@@ -64,3 +64,24 @@ Residual: full narrower Conv1D module install for end-to-end post-removal PPL; L
 
 Residual (scale): full Conv1D surgical module install for true post-removal wall-clock/PPL; licensed WikiText/LAMBADA streams.
 
+## Codex problem-statement fit
+
+Model: `gpt-5.6-sol` · gates: `match` + `validate` · 2026-08-09
+Artifacts: `orchestration/out/match/programmatic-attention.md`, `orchestration/out/validate/programmatic-attention.md`
+
+- **Match verdict:** `MATERIAL_DRIFT` · methods `mixed_proxy`
+- **Validate overall:** `SERIOUS_PROBLEMS` · fit `MATERIAL_DRIFT` · feasibility `RUNNABLE_IF_SHRUNK`
+- **Match summary:** A solid and unusually honest post-hoc intervention/surgery-accounting scaffold, but it stops before the training and runnable deployment experiment that the mentor's posting centrally asks for.
+- **Validate summary:** A polished scaffold surrounds a post-hoc GPT-2 intervention demo, but the training, true model surgery, joint scheduling, and converted-model evaluation needed to answer the mentor's deployment question are still missing.
+
+### Top drift / missing (match)
+- The proposal chooses the training workstream, but no optimizer, backward pass, fine-tuning loop, or trained checkpoint exists.
+- live_soft_anneal is a gate-value evaluation sweep, not annealed training.
+- straight_through returns a NumPy forward value and implements no autograd estimator.
+- The narrowed fused-QKV tensor is counted but never installed; zeroing Q/K is used for behavioral evaluation instead.
+
+### Blocking (validate)
+- `src/progattn/progattn/relax.py`: No differentiable training implementation exists for soft blend, STE, or hard-substitution baselines.
+- `src/progattn/progattn/surgery.py`: Narrowed Q/K arrays are never installed into a runnable attention module; zeroing is evaluated instead of deletion.
+- `src/progattn/progattn/tasks.py`: Perplexity and downstream metrics evaluate an unmodified model, so they cannot measure replacement damage or recovery.
+- `src/progattn/progattn/schedule.py`: The claimed greedy re-measurement is a synthetic superlinear formula, not a joint forward-pass measurement.
