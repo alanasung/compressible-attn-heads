@@ -1,0 +1,26 @@
+# @package _global_
+#
+# The end-to-end run that must finish on the local M4. Small model, pilot item
+# set, cheap evaluation settings. This is the preset `make pilot` uses, and the
+# one that breaks first when a change makes the pipeline too expensive.
+
+defaults:
+  - base_experiment
+  - override /model: qwen0.5b
+  - override /data: pilot
+  - override /eval: fast
+  - override /run: pilot
+  - _self_
+
+experiment:
+  name: pilot
+  task_id: E02
+  description: Full pipeline at pilot scale, sized to finish locally on MPS.
+  stages: [build_dataset, collect, fit, evaluate, report]
+  tags: [pilot, local]
+
+model:
+  batch_size: 8
+
+cache:
+  namespace: pilot
