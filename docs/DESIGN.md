@@ -224,7 +224,7 @@ resume, safe-name validation, and hard errors on version mismatch.
 
 Mentor(s): Belinda Li
 Affiliation(s): Anthropic
-SPAR posting: https://sparai.org/projects/f26/reci1DhApjFAtQx7L
+Related posting: https://sparai.org/projects/f26/reci1DhApjFAtQx7L
 
 ## 21. Glossary
 
@@ -261,7 +261,6 @@ Run `python orchestration/scaffold2.py` from the meta-repo root after template e
 ## Appendix: regeneration
 
 Run `python orchestration/scaffold2.py` from the meta-repo root after template edits.
-
 
 ## 23. Domain methodology: Substitutability Ladder
 

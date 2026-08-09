@@ -1,17 +1,14 @@
 <p align="center">
   <h1 align="center">Substitutability Ladder for Programmatic QK Circuits</h1>
   <p align="center"><strong>Rank every attention head by how cheaply it can be replaced with a hand-written program, then make that substitution survive training.</strong></p>
-  <p align="center">SPAR Fall 2026 · <a href="https://sparai.org/projects/f26/reci1DhApjFAtQx7L">Deploying Programmatic Attention in Real Transformers</a></p>
-</p>
+  </p>
 
 ---
 
 ## Overview
 
 This repository implements the pilot and full experimental profiles for
-**Substitutability Ladder for Programmatic QK Circuits**. The shared engineering spine (config, caching, hooks, metrics,
-ablations, reporting, CI) is generated from a single template so all SPAR Fall
-2026 repos stay aligned on reproducibility.
+**Substitutability Ladder for Programmatic QK Circuits**. Config, caching, hooks, metrics, ablations, reporting, and CI are built for reproducible local pilots on small open-weight models.
 
 Hypothesis (one line): Head substitutability is heavy-tailed and predictable, and more importantly it survives deployment: heads identified as substitutable can have their Q and K projections physically deleted and be retrained with a fixed programmatic pattern, recovering most of the perplexity cost that hard post-hoc substitution incurs, while genuinely reducing parameters rather than merely masking a still-computed pattern.
 
@@ -87,20 +84,18 @@ registry and must pass the harness-validation script before any measured claim.
 
 ## Related work
 
-- SPAR Fall 2026 project posting: https://sparai.org/projects/f26/reci1DhApjFAtQx7L
 - Complexity bar: Critical Data PRIMED-AI / RecursiveJEPA engineering standard
 
 ## Citation
 
 ```bibtex
-@misc{progattn_spar_f26,
+@misc{progattn_pilot,
   title        = {Substitutability Ladder for Programmatic QK Circuits},
   author       = {Belinda Li},
   year         = {2026},
-  howpublished = {SPAR Fall 2026},
+  howpublished = {Research pilot},
   note         = {Rank every attention head by how cheaply it can be replaced with a hand-written program, then make that substitution survive training.},
-  url          = {https://sparai.org/projects/f26/reci1DhApjFAtQx7L}
-}
+  }
 ```
 
 ## License

@@ -1,4 +1,5 @@
 from __future__ import annotations
+
 PROGRAMS = ["previous_token","induction","positional_decay","delimiter","bos_sink","uniform"]
 
 def enrich_items(items, cfg):

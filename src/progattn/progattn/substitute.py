@@ -2,8 +2,9 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Any, Callable
+from typing import Any
 
 import numpy as np
 
@@ -123,7 +124,7 @@ def collect_model_attentions(
             )
             enc = {k: v.to(runtime.device) for k, v in enc.items()}
             out = runtime.model(**enc, output_attentions=True)
-            attns = out.attentions  # tuple[layer] of [batch, heads, q, k]
+            attns = out.attentions  # type: ignore[attr-defined]
             for layer in range(n_layers):
                 a = attns[layer][0].detach().float().cpu().numpy()  # [heads, q, k]
                 for head in range(n_heads):

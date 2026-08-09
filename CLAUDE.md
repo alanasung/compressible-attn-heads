@@ -4,8 +4,7 @@ Context for coding agents working in this repository.
 
 ## What this is
 
-A pilot research implementation of "Substitutability Ladder for Programmatic QK Circuits" targeting the SPAR
-Fall 2026 project "Deploying Programmatic Attention in Real Transformers" (mentor: Belinda Li,
+A pilot research implementation of "Substitutability Ladder for Programmatic QK Circuits" for the research agenda "Deploying Programmatic Attention in Real Transformers" (mentor: Belinda Li,
 Anthropic).
 
 ## Hard constraints

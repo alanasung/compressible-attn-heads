@@ -1,11 +1,20 @@
 """Experiment stages for progattn. Real implementations; no NotImplementedError."""
 from __future__ import annotations
+
 from pathlib import Path
 from typing import Any
+
 from omegaconf import DictConfig
+
 from progattn.progattn.pipeline import (
-    stage_build_dataset, stage_collect, stage_evaluate, stage_fit, stage_report,
+    stage_build_dataset,
+    stage_collect,
+    stage_evaluate,
+    stage_fit,
+    stage_report,
 )
+
+
 def build_dataset(cfg: DictConfig, run_dir: Path) -> dict[str, Any]:
     return stage_build_dataset(cfg, run_dir)
 def collect(cfg: DictConfig, run_dir: Path) -> dict[str, Any]:

@@ -8,6 +8,7 @@ from typing import Any
 import numpy as np
 from omegaconf import DictConfig
 
+from ._util import ensure_dir, read_json, stage_result, write_json
 from .efficiency import efficiency_report
 from .patterns import generate_pattern
 from .relax import compare_relaxations
@@ -16,7 +17,6 @@ from .substitute import collect_model_attentions, synthetic_clean_patterns
 from .surgery import demo_surgery, live_gpt2_surgery
 from .sweep import run_e01_sweep
 from .tasks import evaluate_suite, synthetic_lm_batch
-from ._util import ensure_dir, read_json, stage_result, write_json
 
 
 def _seed(cfg: DictConfig) -> int:

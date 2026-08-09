@@ -1,4 +1,5 @@
-import pytest, numpy as np
+import pytest
+import numpy as np
 from progattn.progattn.patterns import PROGRAMS, generate_pattern
 
 @pytest.mark.parametrize("name", list(PROGRAMS))

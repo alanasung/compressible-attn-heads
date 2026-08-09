@@ -30,7 +30,7 @@ class SurgeryPlan:
 
 
 def _slice_indices(heads: list[int], head_dim: int) -> np.ndarray:
-    idxs = []
+    idxs: list[int] = []
     for h in heads:
         start = h * head_dim
         idxs.extend(range(start, start + head_dim))
@@ -52,11 +52,11 @@ def surgically_narrow_c_attn(
             f"surgically_narrow_c_attn only supports fused GPT-2 QKV; got family={plan.family}. "
             "For separate Q/K/V families use surgically_narrow_separate_qkv."
         )
-    hidden, three = weight.shape[0], weight.shape[1]
+    three = weight.shape[1]
     if three != 3 * plan.hidden:
         if weight.shape[0] == 3 * plan.hidden and weight.shape[1] == plan.hidden:
             weight = weight.T
-            hidden, three = weight.shape[0], weight.shape[1]
+            three = weight.shape[1]
         else:
             raise ValueError(
                 f"expected fused c_attn shape (hidden, 3*hidden); got {weight.shape}"
@@ -236,7 +236,6 @@ def live_gpt2_surgery(
         )
         return out
 
-    import torch
 
     arch = arch_from_model(runtime.model)
     block = runtime.model.transformer.h[layer]

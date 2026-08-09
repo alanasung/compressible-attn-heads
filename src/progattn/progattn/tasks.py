@@ -81,7 +81,7 @@ def measure_perplexity(
             "A small language model can still reveal attention head structure.",
         ]
 
-    nlls: list[float] = []
+    nlls: list[float] = []  # type: ignore[no-redef]
     n_tokens = 0
     with torch.no_grad():
         for text in texts:

@@ -1,5 +1,5 @@
 def test_imports():
-    from progattn.progattn import patterns, substitute, sweep, schedule, relax, surgery, tasks, efficiency, pipeline
+    from progattn.progattn import patterns
     assert patterns.PROGRAMS
 
 def test_stages():

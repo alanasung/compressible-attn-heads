@@ -1,6 +1,5 @@
 from types import SimpleNamespace
 from progattn.stages import STAGES
-import json
 
 def cfg():
     return SimpleNamespace(run=SimpleNamespace(seed=0,profile="smoke"), data=SimpleNamespace(n_items=16), model=SimpleNamespace(name="gpt2"), eval=SimpleNamespace(layers=[2,4,6]))

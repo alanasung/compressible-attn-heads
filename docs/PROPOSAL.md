@@ -3,7 +3,7 @@
 **Target project.** Deploying Programmatic Attention in Real Transformers
 **Mentor.** Belinda Li (Anthropic)
 **Research areas.** Mechanistic interpretability
-**Posting.** https://sparai.org/projects/f26/reci1DhApjFAtQx7L
+**Related posting.** https://sparai.org/projects/f26/reci1DhApjFAtQx7L
 
 ## Summary
 

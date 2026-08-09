@@ -4,8 +4,6 @@ from __future__ import annotations
 
 from typing import Any
 
-import numpy as np
-
 
 def greedy_schedule(e01: dict[str, Any], *, max_replace_frac: float = 0.5) -> dict[str, Any]:
     rows = sorted(e01["rows"], key=lambda r: r["best_kl"])
