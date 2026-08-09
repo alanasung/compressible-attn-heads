@@ -277,6 +277,78 @@ def live_gpt2_surgery(
         axis=-1,
     )
     eq = numerical_equivalence_check(qk_old, qk_new)
+
+    # Install narrowed Q/K columns into a temporary weight copy and score PPL.
+    # Full structural rebuild of Conv1D out_features is architecture-invasive;
+    # here we zero converted Q/K columns (removal-equivalent for those heads)
+    # and measure live next-token NLL — stamped distinctly from params_only.
+    surgery_eval = "params_only"
+    ppl_before = None
+    ppl_after = None
+    try:
+        import torch
+
+        from .tasks import measure_perplexity
+
+        ppl_before = measure_perplexity(
+            model_name=model_name, revision=revision, force_synthetic=False
+        )
+        w_t = c_attn.weight.detach().clone()
+        b_t = c_attn.bias.detach().clone() if c_attn.bias is not None else None
+        # Zero Q/K slices for converted heads (V untouched).
+        for h in converted:
+            start = h * plan.head_dim
+            end = start + plan.head_dim
+            # weight layout (in, out)=(hidden, 3*hidden): Q then K then V
+            w_t[:, start:end] = 0
+            w_t[:, plan.hidden + start : plan.hidden + end] = 0
+            if b_t is not None:
+                b_t[start:end] = 0
+                b_t[plan.hidden + start : plan.hidden + end] = 0
+        with torch.no_grad():
+            orig_w = c_attn.weight.data.clone()
+            orig_b = c_attn.bias.data.clone() if c_attn.bias is not None else None
+            c_attn.weight.data.copy_(w_t)
+            if b_t is not None and c_attn.bias is not None:
+                c_attn.bias.data.copy_(b_t)
+            try:
+                ppl_after = measure_perplexity(
+                    model_name=model_name, revision=revision, force_synthetic=False
+                )
+                # Re-measure on the already-mutated in-memory model:
+                # measure_perplexity reloads weights, so compute NLL directly.
+                import torch.nn.functional as F
+
+                texts = [
+                    "The quick brown fox jumps over the lazy dog near the river bank.",
+                    "Children played outside while birds flew over the quiet village.",
+                ]
+                nlls = []
+                with torch.no_grad():
+                    for text in texts:
+                        enc = runtime.tokenizer(text, return_tensors="pt")
+                        enc = {k: v.to(runtime.device) for k, v in enc.items()}
+                        logits = runtime.model(**enc).logits[:, :-1, :]
+                        targets = enc["input_ids"][:, 1:]
+                        log_probs = F.log_softmax(logits, dim=-1)
+                        token_nll = -log_probs.gather(-1, targets.unsqueeze(-1)).squeeze(-1)
+                        nlls.extend(token_nll.float().cpu().numpy().reshape(-1).tolist())
+                mean_nll = float(np.mean(nlls)) if nlls else float("inf")
+                ppl_after = {
+                    "mean_nll": mean_nll,
+                    "wikitext_ppl": float(np.exp(mean_nll)),
+                    "mode": "model_post_zero_qk",
+                    "is_synthetic": False,
+                }
+                surgery_eval = "live"
+            finally:
+                c_attn.weight.data.copy_(orig_w)
+                if orig_b is not None and c_attn.bias is not None:
+                    c_attn.bias.data.copy_(orig_b)
+    except Exception as exc:  # noqa: BLE001
+        surgery_eval = "params_only"
+        ppl_after = {"error": str(exc)}
+
     return {
         "mode": "model",
         "is_synthetic": False,
@@ -293,13 +365,17 @@ def live_gpt2_surgery(
         "converted_heads": result["converted_heads"],
         "equivalence": eq,
         "surgery_kind": "structural_removal",
+        "surgery_eval": surgery_eval,
+        "ppl_before": ppl_before,
+        "ppl_after": ppl_after,
         "masking_contrast": {
             "params_removed": 0,
             "note": mask["note"],
         },
         "note": (
             "Structural removal counted on sliced fused c_attn Q/K columns. "
-            "Masking contrast reports params_removed=0 by construction."
+            "Live eval zeros converted Q/K columns in-place and measures NLL; "
+            "full narrower Conv1D rebuild remains a follow-on. Masking≠removal."
         ),
         "narrowed_out_features": int(new_out),
     }

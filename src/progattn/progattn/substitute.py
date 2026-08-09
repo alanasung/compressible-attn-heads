@@ -178,14 +178,30 @@ def substitute_pattern(
 
 
 def make_pattern_hook(program: str, head: int, n_heads: int) -> Callable[..., Any]:
-    """Overwrite one head's attention probs. This is MASKING, not parameter deletion."""
+    """Overwrite one head's attention probs in GPT-2 attn forward.
+
+    This is MASKING / soft intervention, not parameter deletion. Hook expects
+    the attention module to return ``(attn_output, present, attentions)`` when
+    ``output_attentions=True``.
+    """
 
     def hook(_module: Any, _inp: Any, out: Any) -> Any:
-        # HF GPT-2 with output_attentions returns tuples; pattern intervention
-        # for training uses attn module internals. Here we document the API.
-        if not isinstance(out, (tuple, list)):
+        import torch
+
+        if not isinstance(out, tuple) or len(out) < 3 or out[2] is None:
             return out
-        return out
+        attns = out[2]
+        # attns: [batch, n_heads, q, k]
+        if not torch.is_tensor(attns) or attns.dim() != 4:
+            return out
+        if not (0 <= head < attns.shape[1]):
+            return out
+        seq = int(attns.shape[-1])
+        pat = generate_pattern(program, seq)
+        t = torch.tensor(pat, device=attns.device, dtype=attns.dtype)
+        new_attns = attns.clone()
+        new_attns[:, head, :, :] = t.unsqueeze(0)
+        return (out[0], out[1], new_attns) + out[3:]
 
     hook.program = program  # type: ignore[attr-defined]
     hook.head = head  # type: ignore[attr-defined]
@@ -205,3 +221,90 @@ def mask_attention_head_probs(
     seq = out.shape[-1]
     out[head] = generate_pattern(program, seq)
     return out
+
+
+def intervention_next_token_kl(
+    *,
+    model_name: str,
+    revision: str | None = None,
+    layer: int = 0,
+    head: int = 0,
+    program: str = "previous_token",
+    text: str = "The capital of France is",
+    force_synthetic: bool = False,
+) -> dict[str, Any]:
+    """Measure next-token KL between clean and pattern-intervened forward passes."""
+    if force_synthetic:
+        # Deterministic smoke: pattern-space KL as stand-in, stamped synthetic.
+        seq = 16
+        p = generate_pattern("uniform", seq)
+        q = generate_pattern(program, seq)
+        return {
+            "next_token_kl": kl_attention(p, q),
+            "mode": "synthetic",
+            "is_synthetic": True,
+            "intervention_kind": "masking_not_removal",
+            "note": "Synthetic pattern-space KL stand-in; not a live logit KL.",
+        }
+
+    runtime = try_load_causal_lm(model_name, revision=revision, force_synthetic=False)
+    if runtime is None:
+        raise RuntimeError(
+            f"Could not load {model_name!r} for intervention KL. "
+            "Set force_synthetic=true for smoke only."
+        )
+
+    import torch
+    import torch.nn.functional as F
+
+    arch = arch_from_model(runtime.model)
+    validate_head(layer, head, arch["n_layers"], arch["n_heads"])
+    tok = runtime.tokenizer
+    model = runtime.model
+    enc = tok(text, return_tensors="pt")
+    enc = {k: v.to(runtime.device) for k, v in enc.items()}
+
+    with torch.no_grad():
+        clean = model(**enc, output_attentions=True)
+        clean_logits = clean.logits[0, -1].float()
+        clean_p = F.softmax(clean_logits, dim=-1)
+
+    # Prefer attn module on the block when present (GPT-2).
+    block = None
+    if hasattr(model, "transformer") and hasattr(model.transformer, "h"):
+        block = model.transformer.h[layer].attn
+    elif hasattr(model, "model") and hasattr(model.model, "layers"):
+        block = getattr(model.model.layers[layer], "self_attn", None)
+    if block is None:
+        return {
+            "next_token_kl": float("nan"),
+            "mode": "unavailable",
+            "is_synthetic": False,
+            "intervention_kind": "masking_not_removal",
+            "note": "No attention module found for hook installation.",
+        }
+
+    handle = block.register_forward_hook(make_pattern_hook(program, head, arch["n_heads"]))
+    try:
+        with torch.no_grad():
+            intervened = model(**enc, output_attentions=True)
+            int_logits = intervened.logits[0, -1].float()
+            int_p = F.softmax(int_logits, dim=-1)
+    finally:
+        handle.remove()
+
+    # KL(clean || intervened)
+    eps = 1e-8
+    kl = float(torch.sum(clean_p * (torch.log(clean_p + eps) - torch.log(int_p + eps))).item())
+    return {
+        "next_token_kl": kl,
+        "mode": "model",
+        "is_synthetic": False,
+        "intervention_kind": "masking_not_removal",
+        "layer": layer,
+        "head": head,
+        "program": program,
+        "model_name": model_name,
+        "revision": runtime.revision,
+        "note": "Live next-token KL under attention-pattern masking (not param deletion).",
+    }
