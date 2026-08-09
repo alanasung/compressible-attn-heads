@@ -278,21 +278,42 @@ def live_gpt2_surgery(
     )
     eq = numerical_equivalence_check(qk_old, qk_new)
 
-    # Install narrowed Q/K columns into a temporary weight copy and score PPL.
-    # Full structural rebuild of Conv1D out_features is architecture-invasive;
-    # here we zero converted Q/K columns (removal-equivalent for those heads)
-    # and measure live next-token NLL — stamped distinctly from params_only.
+    # Prefer in-memory NLL after zeroing converted Q/K columns on the loaded
+    # model. Do not confuse reload PPL (fresh weights) with live zero-QK NLL.
     surgery_eval = "params_only"
     ppl_before = None
     ppl_after = None
     try:
         import torch
+        import torch.nn.functional as F
 
-        from .tasks import measure_perplexity
+        texts = [
+            "The quick brown fox jumps over the lazy dog near the river bank.",
+            "Children played outside while birds flew over the quiet village.",
+        ]
 
-        ppl_before = measure_perplexity(
-            model_name=model_name, revision=revision, force_synthetic=False
-        )
+        def _in_memory_nll() -> dict[str, Any]:
+            nlls: list[float] = []
+            with torch.no_grad():
+                for text in texts:
+                    enc = runtime.tokenizer(text, return_tensors="pt")
+                    enc = {k: v.to(runtime.device) for k, v in enc.items()}
+                    logits = runtime.model(**enc).logits[:, :-1, :]
+                    targets = enc["input_ids"][:, 1:]
+                    log_probs = F.log_softmax(logits, dim=-1)
+                    token_nll = -log_probs.gather(-1, targets.unsqueeze(-1)).squeeze(-1)
+                    nlls.extend(token_nll.float().cpu().numpy().reshape(-1).tolist())
+            mean_nll = float(np.mean(nlls)) if nlls else float("inf")
+            return {
+                "mean_nll": mean_nll,
+                "wikitext_ppl": float(np.exp(mean_nll)),
+                "mode": "in_memory",
+                "is_synthetic": False,
+            }
+
+        ppl_before = _in_memory_nll()
+        ppl_before["mode"] = "in_memory_pre_zero_qk"
+
         w_t = c_attn.weight.detach().clone()
         b_t = c_attn.bias.detach().clone() if c_attn.bias is not None else None
         # Zero Q/K slices for converted heads (V untouched).
@@ -312,35 +333,9 @@ def live_gpt2_surgery(
             if b_t is not None and c_attn.bias is not None:
                 c_attn.bias.data.copy_(b_t)
             try:
-                ppl_after = measure_perplexity(
-                    model_name=model_name, revision=revision, force_synthetic=False
-                )
-                # Re-measure on the already-mutated in-memory model:
-                # measure_perplexity reloads weights, so compute NLL directly.
-                import torch.nn.functional as F
-
-                texts = [
-                    "The quick brown fox jumps over the lazy dog near the river bank.",
-                    "Children played outside while birds flew over the quiet village.",
-                ]
-                nlls = []
-                with torch.no_grad():
-                    for text in texts:
-                        enc = runtime.tokenizer(text, return_tensors="pt")
-                        enc = {k: v.to(runtime.device) for k, v in enc.items()}
-                        logits = runtime.model(**enc).logits[:, :-1, :]
-                        targets = enc["input_ids"][:, 1:]
-                        log_probs = F.log_softmax(logits, dim=-1)
-                        token_nll = -log_probs.gather(-1, targets.unsqueeze(-1)).squeeze(-1)
-                        nlls.extend(token_nll.float().cpu().numpy().reshape(-1).tolist())
-                mean_nll = float(np.mean(nlls)) if nlls else float("inf")
-                ppl_after = {
-                    "mean_nll": mean_nll,
-                    "wikitext_ppl": float(np.exp(mean_nll)),
-                    "mode": "model_post_zero_qk",
-                    "is_synthetic": False,
-                }
-                surgery_eval = "live"
+                ppl_after = _in_memory_nll()
+                ppl_after["mode"] = "in_memory_post_zero_qk"
+                surgery_eval = "live_zero_qk"
             finally:
                 c_attn.weight.data.copy_(orig_w)
                 if orig_b is not None and c_attn.bias is not None:
@@ -374,8 +369,10 @@ def live_gpt2_surgery(
         },
         "note": (
             "Structural removal counted on sliced fused c_attn Q/K columns. "
-            "Live eval zeros converted Q/K columns in-place and measures NLL; "
-            "full narrower Conv1D rebuild remains a follow-on. Masking≠removal."
+            "surgery_eval=live_zero_qk measures in-memory NLL after zeroing "
+            "converted Q/K (not reload PPL). Full narrower Conv1D rebuild "
+            "remains a follow-on. Masking≠removal; no param-reduction claim "
+            "without structural slice accounting."
         ),
         "narrowed_out_features": int(new_out),
     }

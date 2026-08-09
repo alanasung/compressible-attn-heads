@@ -38,3 +38,16 @@ Grok PASS_WITH_NOTES on the measurable core. Codex SERIOUS_PROBLEMS remains on e
 - Claim gating tightened where proxies previously looked like evidence.
 - Domain tests green without Hub downloads.
 
+## P6 executable intervention + ranking honesty
+
+| Fix | Status |
+|---|---|
+| Pattern hook rebuilds `attn_output` (program × values / GPT-2 `c_attn` path) | OK (`make_pattern_hook` executable) |
+| Live `intervention_next_token_kl` moves logits under FakeModel | OK (Hub-free unit test) |
+| E01 schedules on pattern KL then re-ranks with next-token KL when measured | OK (`kl_space`, `rank_kl`) |
+| Smoke / `force_synthetic` stays `kl_space=pattern`; no behavioral claim | OK |
+| Surgery eval prefers in-memory zero-QK NLL (`surgery_eval=live_zero_qk`) | OK |
+| Fail-closed measured path; synthetic smoke-only | OK |
+
+Residual: full narrower Conv1D module install for end-to-end post-removal PPL; LAMBADA/BLiMP remain schedule proxies.
+

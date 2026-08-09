@@ -134,6 +134,8 @@ def stage_fit(cfg: DictConfig, run_dir: Path) -> dict[str, Any]:
         seq_len=int(clean["seq_len"]),
         seed=_seed(cfg),
         clean=clean,
+        model_name=None if force else _model_name(cfg),
+        revision=None if force else _revision(cfg),
         force_synthetic=force,
     )
     schedule = greedy_schedule(e01, max_replace_frac=0.25)
@@ -174,6 +176,10 @@ def stage_fit(cfg: DictConfig, run_dir: Path) -> dict[str, Any]:
         "masking_params_removed": surgery.get("masking_contrast", {}).get("params_removed", 0),
         "soft_final_distance": relax["soft_final_distance"],
         "surgery_mode": surgery.get("mode"),
+        "surgery_eval": surgery.get("surgery_eval"),
+        "kl_space": e01.get("kl_space", e01["metrics"].get("kl_space", "pattern")),
+        "is_synthetic": bool(e01.get("is_synthetic", force)),
+        "schedule_kl_space": schedule.get("kl_space"),
     }
     payload = stage_result(task="fit", seed=_seed(cfg), n=e01["n_heads_total"], metrics=metrics)
     write_json(out / "results.json", payload)

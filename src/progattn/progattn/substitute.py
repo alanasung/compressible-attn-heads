@@ -177,36 +177,145 @@ def substitute_pattern(
     return p[:s, :s], q[:s, :s], kl_attention(p[:s, :s], q[:s, :s])
 
 
-def make_pattern_hook(program: str, head: int, n_heads: int) -> Callable[..., Any]:
-    """Overwrite one head's attention probs in GPT-2 attn forward.
+def _pattern_tensor(program: str, seq: int, *, device: Any, dtype: Any) -> Any:
+    import torch
 
-    This is MASKING / soft intervention, not parameter deletion. Hook expects
-    the attention module to return ``(attn_output, present, attentions)`` when
-    ``output_attentions=True``.
+    pat = generate_pattern(program, seq)
+    return torch.tensor(pat, device=device, dtype=dtype)
+
+
+def _intervene_gpt2_style(
+    module: Any,
+    hidden_states: Any,
+    out: Any,
+    program: str,
+    head: int,
+    n_heads: int,
+) -> Any:
+    """Rebuild attn_output via program pattern × values (affects logits)."""
+    import torch
+
+    split_size = int(getattr(module, "split_size", hidden_states.shape[-1]))
+    head_dim = int(getattr(module, "head_dim", split_size // max(n_heads, 1)))
+    query_states, key_states, value_states = module.c_attn(hidden_states).split(
+        split_size, dim=2
+    )
+    # [batch, heads, seq, head_dim]
+    bsz, seq, _ = query_states.shape
+    value_states = value_states.view(bsz, seq, n_heads, head_dim).transpose(1, 2)
+
+    # Prefer original attentions when present; otherwise build a soft causal baseline.
+    base_attns = None
+    if isinstance(out, tuple) and len(out) >= 3 and out[2] is not None and torch.is_tensor(out[2]):
+        base_attns = out[2]
+    if base_attns is None:
+        # Causal uniform fallback when weights were not returned.
+        mask = torch.tril(torch.ones(seq, seq, device=hidden_states.device, dtype=hidden_states.dtype))
+        base_attns = (mask / mask.sum(dim=-1, keepdim=True)).view(1, 1, seq, seq).expand(
+            bsz, n_heads, seq, seq
+        )
+
+    new_attns = base_attns.clone()
+    if not (0 <= head < new_attns.shape[1]):
+        return out
+    t = _pattern_tensor(program, seq, device=new_attns.device, dtype=new_attns.dtype)
+    new_attns[:, head, :, :] = t.unsqueeze(0)
+
+    # context: [batch, heads, seq, head_dim] -> merge -> project
+    context = torch.matmul(new_attns, value_states)
+    merged = context.transpose(1, 2).contiguous().view(bsz, seq, n_heads * head_dim)
+    attn_output = module.c_proj(merged)
+    if hasattr(module, "resid_dropout"):
+        attn_output = module.resid_dropout(attn_output)
+
+    present = out[1] if isinstance(out, tuple) and len(out) > 1 else None
+    if isinstance(out, tuple) and len(out) >= 3:
+        return (attn_output, present, new_attns) + out[3:]
+    if isinstance(out, tuple):
+        return (attn_output, present) + out[2:]
+    return attn_output
+
+
+def _intervene_value_cache(
+    module: Any,
+    out: Any,
+    program: str,
+    head: int,
+) -> Any:
+    """Rebuild merged head output from ``module._progattn_values`` × new pattern."""
+    import torch
+
+    if not isinstance(out, tuple) or len(out) < 3 or out[2] is None:
+        return out
+    attns = out[2]
+    values = getattr(module, "_progattn_values", None)
+    if not torch.is_tensor(attns) or attns.dim() != 4 or not torch.is_tensor(values):
+        return out
+    if not (0 <= head < attns.shape[1]):
+        return out
+    seq = int(attns.shape[-1])
+    new_attns = attns.clone()
+    new_attns[:, head, :, :] = _pattern_tensor(
+        program, seq, device=attns.device, dtype=attns.dtype
+    ).unsqueeze(0)
+    # values: [batch, heads, seq, head_dim]
+    context = torch.matmul(new_attns, values)
+    bsz, n_heads, seq_len, head_dim = context.shape
+    merged = context.transpose(1, 2).contiguous().view(bsz, seq_len, n_heads * head_dim)
+    if hasattr(module, "c_proj"):
+        merged = module.c_proj(merged)
+    return (merged, out[1], new_attns) + out[3:]
+
+
+def make_pattern_hook(program: str, head: int, n_heads: int) -> Callable[..., Any]:
+    """Executable pattern intervention for GPT-2-style attention modules.
+
+    Replaces the probabilities used for ``attn @ V`` (or rebuilds ``attn_output``
+    from program pattern × values) so next-token logits change. Mutating only the
+    debug attentions tensor is insufficient and is not used as the primary path.
+
+    This is MASKING / soft intervention, not parameter deletion.
     """
 
-    def hook(_module: Any, _inp: Any, out: Any) -> Any:
+    def hook(module: Any, inp: Any, out: Any) -> Any:
         import torch
 
-        if not isinstance(out, tuple) or len(out) < 3 or out[2] is None:
-            return out
-        attns = out[2]
-        # attns: [batch, n_heads, q, k]
-        if not torch.is_tensor(attns) or attns.dim() != 4:
-            return out
-        if not (0 <= head < attns.shape[1]):
-            return out
-        seq = int(attns.shape[-1])
-        pat = generate_pattern(program, seq)
-        t = torch.tensor(pat, device=attns.device, dtype=attns.dtype)
-        new_attns = attns.clone()
-        new_attns[:, head, :, :] = t.unsqueeze(0)
-        return (out[0], out[1], new_attns) + out[3:]
+        hidden = None
+        if isinstance(inp, (tuple, list)) and inp:
+            hidden = inp[0]
+        elif torch.is_tensor(inp):
+            hidden = inp
+
+        # Preferred: GPT-2 fused c_attn / c_proj path — rebuild projected output.
+        if (
+            hidden is not None
+            and torch.is_tensor(hidden)
+            and hasattr(module, "c_attn")
+            and hasattr(module, "c_proj")
+        ):
+            return _intervene_gpt2_style(module, hidden, out, program, head, n_heads)
+
+        # Test / generic path: values cached on the module during forward.
+        if getattr(module, "_progattn_values", None) is not None:
+            return _intervene_value_cache(module, out, program, head)
+
+        # Last resort: edit returned attentions only (does NOT affect logits).
+        if isinstance(out, tuple) and len(out) >= 3 and out[2] is not None:
+            attns = out[2]
+            if torch.is_tensor(attns) and attns.dim() == 4 and 0 <= head < attns.shape[1]:
+                seq = int(attns.shape[-1])
+                new_attns = attns.clone()
+                new_attns[:, head, :, :] = _pattern_tensor(
+                    program, seq, device=attns.device, dtype=attns.dtype
+                ).unsqueeze(0)
+                return (out[0], out[1], new_attns) + out[3:]
+        return out
 
     hook.program = program  # type: ignore[attr-defined]
     hook.head = head  # type: ignore[attr-defined]
     hook.n_heads = n_heads  # type: ignore[attr-defined]
     hook.intervention_kind = "masking_not_removal"  # type: ignore[attr-defined]
+    hook.executable = True  # type: ignore[attr-defined]
     return hook
 
 
@@ -243,6 +352,7 @@ def intervention_next_token_kl(
             "next_token_kl": kl_attention(p, q),
             "mode": "synthetic",
             "is_synthetic": True,
+            "kl_space": "pattern",
             "intervention_kind": "masking_not_removal",
             "note": "Synthetic pattern-space KL stand-in; not a live logit KL.",
         }
@@ -280,6 +390,7 @@ def intervention_next_token_kl(
             "next_token_kl": float("nan"),
             "mode": "unavailable",
             "is_synthetic": False,
+            "kl_space": "next_token",
             "intervention_kind": "masking_not_removal",
             "note": "No attention module found for hook installation.",
         }
@@ -300,6 +411,7 @@ def intervention_next_token_kl(
         "next_token_kl": kl,
         "mode": "model",
         "is_synthetic": False,
+        "kl_space": "next_token",
         "intervention_kind": "masking_not_removal",
         "layer": layer,
         "head": head,
