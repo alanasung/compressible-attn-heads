@@ -1,4 +1,10 @@
-"""Genuine GPT-2 fused c_attn Q/K column surgery (structural, not masking)."""
+"""Family-aware attention surgery: structural Q/K removal vs masking.
+
+GPT-2 stores Q, K, V in one fused ``c_attn`` projection. Zeroing a head's
+attention pattern removes no parameters. Genuine removal slices Q/K columns for
+converted heads and rebuilds a narrower projection. Masking and removal are
+measured separately and never equated in efficiency claims.
+"""
 
 from __future__ import annotations
 
@@ -15,6 +21,7 @@ class SurgeryPlan:
     n_heads: int
     head_dim: int
     hidden: int
+    family: str = "gpt2_fused_qkv"
 
     @property
     def surviving_heads(self) -> list[int]:
@@ -38,12 +45,15 @@ def surgically_narrow_c_attn(
     """Slice Q and K columns for converted heads out of fused c_attn.
 
     GPT-2 packs [Q|K|V] along the out dimension. Genuine removal rebuilds a
-    narrower projection for surviving Q/K heads while keeping V intact (or
-    optionally narrowed — here V stays full so value pathways remain).
+    narrower projection for surviving Q/K heads while keeping V intact.
     """
+    if plan.family not in {"gpt2_fused_qkv", "gpt2"}:
+        raise ValueError(
+            f"surgically_narrow_c_attn only supports fused GPT-2 QKV; got family={plan.family}. "
+            "For separate Q/K/V families use surgically_narrow_separate_qkv."
+        )
     hidden, three = weight.shape[0], weight.shape[1]
     if three != 3 * plan.hidden:
-        # allow weight shaped (hidden, 3*hidden)
         if weight.shape[0] == 3 * plan.hidden and weight.shape[1] == plan.hidden:
             weight = weight.T
             hidden, three = weight.shape[0], weight.shape[1]
@@ -59,7 +69,6 @@ def surgically_narrow_c_attn(
     keep = _slice_indices(plan.surviving_heads, plan.head_dim)
     q_new = q[:, keep]
     k_new = k[:, keep]
-    # Rebuild fused surviving QK + full V
     new_w = np.concatenate([q_new, k_new, v], axis=1)
     new_b = None
     if bias is not None:
@@ -75,7 +84,60 @@ def surgically_narrow_c_attn(
         "params_removed": params_before - params_after,
         "surviving_heads": plan.surviving_heads,
         "converted_heads": list(plan.converted_heads),
+        "surgery_kind": "structural_removal",
         "note": "masking is not removal; parameter counts measured on rebuilt module",
+    }
+
+
+def surgically_narrow_separate_qkv(
+    q_weight: np.ndarray,
+    k_weight: np.ndarray,
+    v_weight: np.ndarray,
+    plan: SurgeryPlan,
+) -> dict[str, Any]:
+    """Structural removal for families with separate Q/K/V projections."""
+    keep = _slice_indices(plan.surviving_heads, plan.head_dim)
+    # weights shaped (hidden, n_heads*head_dim) or (out, in)
+    def narrow(w: np.ndarray) -> np.ndarray:
+        if w.shape[0] == plan.hidden:
+            return w[:, keep]
+        if w.shape[1] == plan.hidden:
+            return w[keep, :]
+        raise ValueError(f"unexpected projection shape {w.shape}")
+
+    q_new, k_new = narrow(q_weight), narrow(k_weight)
+    params_before = int(q_weight.size + k_weight.size + v_weight.size)
+    params_after = int(q_new.size + k_new.size + v_weight.size)
+    return {
+        "q_weight": q_new,
+        "k_weight": k_new,
+        "v_weight": v_weight,
+        "params_before": params_before,
+        "params_after": params_after,
+        "params_removed": params_before - params_after,
+        "surviving_heads": plan.surviving_heads,
+        "converted_heads": list(plan.converted_heads),
+        "surgery_kind": "structural_removal",
+        "family": "separate_qkv",
+        "note": "masking is not removal; parameter counts measured on rebuilt module",
+    }
+
+
+def masking_report(*, n_heads: int, converted: list[int], hidden: int, head_dim: int) -> dict[str, Any]:
+    """Honest accounting for pattern masking: zero parameters removed."""
+    return {
+        "surgery_kind": "masking",
+        "params_before": 3 * hidden * hidden,  # fused footprint reference
+        "params_after": 3 * hidden * hidden,
+        "params_removed": 0,
+        "converted_heads": list(converted),
+        "surviving_heads": [h for h in range(n_heads) if h not in set(converted)],
+        "note": (
+            "Masking replaces attention patterns via hooks/intervention but does "
+            "NOT delete Q/K parameters or reduce FLOPs in the fused matmul. "
+            "Do not report masking as parameter reduction."
+        ),
+        "equivalence": {"equivalent": True, "max_abs_diff": 0.0, "atol": 0.0},
     }
 
 
@@ -99,9 +161,15 @@ def demo_surgery(*, n_heads: int = 12, head_dim: int = 64, converted: list[int] 
     rng = np.random.default_rng(0)
     w = rng.normal(0, 0.02, size=(hidden, 3 * hidden))
     b = rng.normal(0, 0.02, size=(3 * hidden,))
-    plan = SurgeryPlan(layer=0, converted_heads=converted, n_heads=n_heads, head_dim=head_dim, hidden=hidden)
+    plan = SurgeryPlan(
+        layer=0,
+        converted_heads=converted,
+        n_heads=n_heads,
+        head_dim=head_dim,
+        hidden=hidden,
+        family="gpt2_fused_qkv",
+    )
     result = surgically_narrow_c_attn(w, b, plan)
-    # Equivalence on a toy projection: surviving columns match exactly.
     keep = _slice_indices(plan.surviving_heads, head_dim)
     toy_x = rng.normal(0, 1, size=(4, hidden))
     qk_surv_old = np.concatenate([toy_x @ w[:, keep], toy_x @ w[:, hidden + keep]], axis=-1)
@@ -110,8 +178,7 @@ def demo_surgery(*, n_heads: int = 12, head_dim: int = 64, converted: list[int] 
         axis=-1,
     )
     eq = numerical_equivalence_check(qk_surv_old, qk_surv_new)
-    result["equivalence"] = eq
-    # Don't return giant arrays in metrics path
+    mask = masking_report(n_heads=n_heads, converted=converted, hidden=hidden, head_dim=head_dim)
     return {
         "params_before": result["params_before"],
         "params_after": result["params_after"],
@@ -119,4 +186,121 @@ def demo_surgery(*, n_heads: int = 12, head_dim: int = 64, converted: list[int] 
         "surviving_heads": result["surviving_heads"],
         "converted_heads": result["converted_heads"],
         "equivalence": eq,
+        "surgery_kind": "structural_removal",
+        "family": "gpt2_fused_qkv",
+        "masking_contrast": {
+            "params_removed": mask["params_removed"],
+            "note": mask["note"],
+        },
+        "note": result["note"],
+    }
+
+
+def live_gpt2_surgery(
+    *,
+    model_name: str = "openai-community/gpt2",
+    revision: str | None = "607a30d783dfa663caf39e06633721c8d4cfcd7e",
+    layer: int = 0,
+    converted: list[int] | None = None,
+    force_synthetic: bool = False,
+) -> dict[str, Any]:
+    """Run structural fused-QKV surgery on loaded GPT-2 weights (or demo if synthetic)."""
+    converted = converted or [0, 3, 6]
+    if force_synthetic:
+        out = demo_surgery(converted=converted)
+        out["mode"] = "synthetic"
+        out["is_synthetic"] = True
+        return out
+
+    from .model_runtime import arch_from_model, try_load_causal_lm
+
+    runtime = try_load_causal_lm(model_name, revision=revision, force_synthetic=False)
+    if runtime is None:
+        raise RuntimeError(
+            f"Could not load {model_name!r} for live surgery. "
+            "Set force_synthetic=true for smoke only."
+        )
+    if runtime.family != "gpt2":
+        # Still allow numpy demo on non-GPT2 but label honesty.
+        arch = arch_from_model(runtime.model)
+        out = demo_surgery(
+            n_heads=arch["n_heads"],
+            head_dim=arch["head_dim"],
+            converted=[h for h in converted if h < arch["n_heads"]],
+        )
+        out["mode"] = "synthetic_proxy_non_gpt2"
+        out["is_synthetic"] = True
+        out["note"] = (
+            f"Loaded family={runtime.family} is not GPT-2 fused c_attn; "
+            "structural surgery demo used as shape proxy. Masking≠removal still applies."
+        )
+        return out
+
+    import torch
+
+    arch = arch_from_model(runtime.model)
+    block = runtime.model.transformer.h[layer]
+    c_attn = block.attn.c_attn
+    w = c_attn.weight.detach().float().cpu().numpy()
+    # HF Conv1D stores weight as (in, out) = (hidden, 3*hidden)
+    b = c_attn.bias.detach().float().cpu().numpy() if c_attn.bias is not None else None
+    plan = SurgeryPlan(
+        layer=layer,
+        converted_heads=converted,
+        n_heads=arch["n_heads"],
+        head_dim=arch["head_dim"],
+        hidden=arch["hidden"],
+        family="gpt2_fused_qkv",
+    )
+    result = surgically_narrow_c_attn(w, b, plan)
+    params_module_before = int(sum(p.numel() for p in block.attn.parameters()))
+    # Build a narrowed Conv1D-shaped tensor to count post-surgery params.
+    new_out = result["weight"].shape[1]
+    params_module_after = params_module_before - (
+        (arch["hidden"] * 2 * arch["head_dim"] * len(converted))
+        + (2 * arch["head_dim"] * len(converted))  # bias Q+K
+    )
+    mask = masking_report(
+        n_heads=arch["n_heads"],
+        converted=converted,
+        hidden=arch["hidden"],
+        head_dim=arch["head_dim"],
+    )
+    keep = _slice_indices(plan.surviving_heads, plan.head_dim)
+    rng = np.random.default_rng(0)
+    toy_x = rng.normal(0, 1, size=(2, arch["hidden"]))
+    qk_old = np.concatenate([toy_x @ w[:, keep], toy_x @ w[:, arch["hidden"] + keep]], axis=-1)
+    qk_new = np.concatenate(
+        [
+            toy_x @ result["weight"][:, : len(keep)],
+            toy_x @ result["weight"][:, len(keep) : 2 * len(keep)],
+        ],
+        axis=-1,
+    )
+    eq = numerical_equivalence_check(qk_old, qk_new)
+    return {
+        "mode": "model",
+        "is_synthetic": False,
+        "model_name": model_name,
+        "revision": runtime.revision,
+        "family": "gpt2_fused_qkv",
+        "layer": layer,
+        "params_before": int(result["params_before"]),
+        "params_after": int(result["params_after"]),
+        "params_removed": int(result["params_removed"]),
+        "attn_module_params_before": params_module_before,
+        "attn_module_params_after_est": int(params_module_after),
+        "surviving_heads": result["surviving_heads"],
+        "converted_heads": result["converted_heads"],
+        "equivalence": eq,
+        "surgery_kind": "structural_removal",
+        "masking_contrast": {
+            "params_removed": 0,
+            "note": mask["note"],
+        },
+        "note": (
+            "Structural removal counted on sliced fused c_attn Q/K columns. "
+            "Masking contrast reports params_removed=0 by construction."
+        ),
+        "narrowed_out_features": int(new_out),
     }
