@@ -15,7 +15,7 @@ from progattn.progattn.efficiency import (
     measure_forward_wall_clock,
 )
 from progattn.progattn.relax import compare_relaxations, live_soft_anneal
-from progattn.progattn.substitute import gated_pattern_next_token_kl, make_pattern_hook
+from progattn.progattn.substitute import gated_pattern_next_token_kl
 from progattn.progattn.tasks import (
     evaluate_local_fixture_suite,
     evaluate_proxy_suite,
