@@ -1,9 +1,7 @@
-# Proposal: Substitutability Ladder for Programmatic QK Circuits
+# Deploying Programmatic Attention in Transformers
 
 **Target project.** Deploying Programmatic Attention in Real Transformers
-**Mentor.** Belinda Li (Anthropic)
 **Research areas.** Mechanistic interpretability
-**Related posting.** https://sparai.org/projects/f26/reci1DhApjFAtQx7L
 
 ## Summary
 
@@ -21,7 +19,7 @@ reportable rather than a dead end.
 
 1. Per head, what is the next-token KL divergence when its attention pattern is replaced by a programmatic proxy (previous-token, induction, positional decay, delimiter-attending, BOS sink, uniform)?
 2. Does a greedy schedule over per-head cost let us replace a large fraction of heads before perplexity degrades noticeably?
-3. Hard-fixing a pattern kills the QK gradient. Do a gated soft blend with annealing, or a straight-through estimator, keep training stable? This is the mentor's stated application question, answered empirically.
+3. Hard-fixing a pattern kills the QK gradient. Do a gated soft blend with annealing, or a straight-through estimator, keep training stable? This is the motivating stated application question, answered empirically.
 4. After annealing, can the learned QK branch be deleted outright so the head is natively programmatic, and what does that cost?
 
 ## Method
@@ -65,7 +63,7 @@ reportable rather than a dead end.
 
 ## Workstream choice
 
-This repo commits to the TRAINING workstream, with the post-hoc substitutability sweep serving only as the head-selection instrument that the training work needs. The mentor's framing is a bridge from explainability to deployment, so the endpoint here is a model trained with programmatic QK heads whose learned Q and K projections have been removed, not a hook-based intervention on a frozen model. Kernel-level inference efficiency is explicitly out of scope and named as such.
+This repo commits to the TRAINING workstream, with the post-hoc substitutability sweep serving only as the head-selection instrument that the training work needs. the motivating framing is a bridge from explainability to deployment, so the endpoint here is a model trained with programmatic QK heads whose learned Q and K projections have been removed, not a hook-based intervention on a frozen model. Kernel-level inference efficiency is explicitly out of scope and named as such.
 
 ## Pre-registered update thresholds
 
@@ -81,7 +79,6 @@ real GPU is available, so the reduction in scale is explicit rather than hidden.
 
 ## Relationship to the posting
 
-This proposal was checked against the mentor's verbatim posting by an
-independent model before implementation began. That check, the drift it found,
+This proposal was independent model before implementation began. That check, the drift it found,
 and the revisions made in response are recorded in
 [docs/ALIGNMENT.md](ALIGNMENT.md).

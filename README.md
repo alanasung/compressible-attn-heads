@@ -1,18 +1,15 @@
 <p align="center">
-  <h1 align="center">Substitutability Ladder for Programmatic QK Circuits</h1>
-  <p align="center"><strong>Rank every attention head by how cheaply it can be replaced with a hand-written program, then make that substitution survive training.</strong></p>
+  <h1 align="center">Deploying Programmatic Attention in Transformers</h1>
+  <p align="center"><strong>Rank heads by substitutability with hand-written programs, then surgically install those programs for real efficiency gains.</strong></p>
   </p>
 
 ---
 
 ## Overview
 
-This repository implements the pilot and full experimental profiles for
-**Substitutability Ladder for Programmatic QK Circuits**. Config, caching, hooks, metrics, ablations, reporting, and CI are built for reproducible local pilots on small open-weight models.
+This repository implements experimental profiles for **Deploying Programmatic Attention in Transformers**. Config, caching, hooks, metrics, ablations, reporting, and CI are built for reproducible local pilots on small open-weight models.
 
 Hypothesis (one line): Head substitutability is heavy-tailed and predictable, and more importantly it survives deployment: heads identified as substitutable can have their Q and K projections physically deleted and be retrained with a fixed programmatic pattern, recovering most of the perplexity cost that hard post-hoc substitution incurs, while genuinely reducing parameters rather than merely masking a still-computed pattern.
-
-Mentors: Belinda Li (Anthropic).
 
 ## Motivation
 
@@ -89,13 +86,12 @@ registry and must pass the harness-validation script before any measured claim.
 ## Citation
 
 ```bibtex
-@misc{progattn_pilot,
-  title        = {Substitutability Ladder for Programmatic QK Circuits},
-  author       = {Belinda Li},
+@misc{programmatic_attention_pilot,
+  title        = {Deploying Programmatic Attention in Transformers},
+  author       = {Alana Sung},
   year         = {2026},
-  howpublished = {Research pilot},
-  note         = {Rank every attention head by how cheaply it can be replaced with a hand-written program, then make that substitution survive training.},
-  }
+  howpublished = {Technical report},
+}
 ```
 
 ## License

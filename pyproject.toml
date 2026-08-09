@@ -5,11 +5,11 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "progattn"
 version = "0.1.0"
-description = "Rank every attention head by how cheaply it can be replaced with a hand-written program, then make that substitution survive training."
+description = "From post-hoc QK programs to structural deployment."
 readme = "README.md"
 requires-python = ">=3.10,<3.13"
 license = { text = "MIT" }
-authors = [{ name = "Belinda Li" }]
+authors = [{ name = "Alana Sung" }]
 dependencies = [
   "torch==2.6.0",
   "transformers==4.48.0",

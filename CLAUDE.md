@@ -4,8 +4,7 @@ Context for coding agents working in this repository.
 
 ## What this is
 
-A pilot research implementation of "Substitutability Ladder for Programmatic QK Circuits" for the research agenda "Deploying Programmatic Attention in Real Transformers" (mentor: Belinda Li,
-Anthropic).
+Research implementation of "Deploying Programmatic Attention in Transformers".
 
 ## Hard constraints
 
@@ -21,7 +20,7 @@ Anthropic).
 
 Implement the stages in `src/progattn/stages.py`. The signatures,
 dependency edges, and docstring contracts are fixed; they encode an experiment
-design that was checked against the mentor's posting before implementation
+design that was checked against the motivating posting before implementation
 started. Do not renegotiate them. If a contract is genuinely wrong, change it in
 `docs/EXPERIMENT_PLAN.md` first and explain why.
 

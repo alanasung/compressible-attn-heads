@@ -7,7 +7,7 @@
 
 ## Grok (p4 dual)
 - Verdict: MINOR_DRIFT
-- Summary: Deployment-focused substitutability→surgery ladder matches Belinda Li; residual drift is incomplete live FT/recovery and proxy downstream tasks, not a different program.
+- Summary: Deployment-focused substitutability→surgery ladder matches ; residual drift is incomplete live FT/recovery and proxy downstream tasks, not a different program.
 - Detail: `orchestration/out/grok/align/programmatic-attention.p4.md`
 
 ## Reconciliation
