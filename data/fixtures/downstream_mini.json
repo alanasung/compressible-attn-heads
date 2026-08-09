@@ -1,0 +1,79 @@
+{
+  "corpus": "local_downstream_mini",
+  "license": "synthetic-local-fixture",
+  "note": "Tiny Hub-free LAMBADA/BLiMP/IOI-style items for pilot claims_downstream.",
+  "lambada": [
+    {
+      "id": "lam_0",
+      "context": "The capital of France is known for its art museums and the Eiffel Tower. The capital is",
+      "target": "Paris"
+    },
+    {
+      "id": "lam_1",
+      "context": "Water freezes at zero degrees Celsius and boils at one hundred. Ice is frozen",
+      "target": "water"
+    },
+    {
+      "id": "lam_2",
+      "context": "After years of practice she finally played the piano with confidence. She played the",
+      "target": "piano"
+    },
+    {
+      "id": "lam_3",
+      "context": "The baker put the loaves into the hot oven. The bread was in the",
+      "target": "oven"
+    }
+  ],
+  "blimp": [
+    {
+      "id": "blimp_0",
+      "good": "The cats are sleeping on the mat.",
+      "bad": "The cats is sleeping on the mat.",
+      "phenomenon": "subject_verb_agreement"
+    },
+    {
+      "id": "blimp_1",
+      "good": "Which book did the student read yesterday?",
+      "bad": "Which book the student did read yesterday?",
+      "phenomenon": "wh_movement"
+    },
+    {
+      "id": "blimp_2",
+      "good": "The teacher gave the students the homework.",
+      "bad": "The teacher gave the homework the students.",
+      "phenomenon": "dative"
+    },
+    {
+      "id": "blimp_3",
+      "good": "There is a book on the table.",
+      "bad": "There are a book on the table.",
+      "phenomenon": "expletive_agreement"
+    }
+  ],
+  "ioi": [
+    {
+      "id": "ioi_0",
+      "prompt": "When John and Mary went to the store, John gave a drink to",
+      "correct": "Mary",
+      "incorrect": "John"
+    },
+    {
+      "id": "ioi_1",
+      "prompt": "After Alice and Bob finished the project, Alice thanked",
+      "correct": "Bob",
+      "incorrect": "Alice"
+    },
+    {
+      "id": "ioi_2",
+      "prompt": "While Emma and Oliver cooked dinner, Emma handed the spoon to",
+      "correct": "Oliver",
+      "incorrect": "Emma"
+    },
+    {
+      "id": "ioi_3",
+      "prompt": "Because Sam and Riley studied together, Sam lent notes to",
+      "correct": "Riley",
+      "incorrect": "Sam"
+    }
+  ]
+}

@@ -25,6 +25,8 @@ venv/
 !/data/manifests/
 /data/manifests/**
 !/data/manifests/.gitkeep
+!/data/fixtures/
+!/data/fixtures/**
 /results/
 /outputs/
 /runs/

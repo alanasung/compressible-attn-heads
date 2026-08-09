@@ -8,6 +8,7 @@ and result tables are gitignored.
 | Path | Committed? | Purpose |
 |---|---|---|
 | `data/README.md` | yes | This file |
+| `data/fixtures/downstream_mini.json` | yes | Hub-free LAMBADA/BLiMP/IOI-style pilot items |
 | `data/manifests/*.json` | yes if < 2 KB | Dataset provenance (seed, n, version) |
 | `data/raw/` | never | Downstream download target |
 | `data/processed/` | never | Split caches |

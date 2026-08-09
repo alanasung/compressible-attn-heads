@@ -51,3 +51,16 @@ Grok PASS_WITH_NOTES on the measurable core. Codex SERIOUS_PROBLEMS remains on e
 
 Residual: full narrower Conv1D module install for end-to-end post-removal PPL; LAMBADA/BLiMP remain schedule proxies.
 
+## P7 rigor pass (local fixtures + live anneal + wall-clock honesty)
+
+| Fix | Status |
+|---|---|
+| Bundled Hub-free downstream mini fixtures | OK (`data/fixtures/downstream_mini.json`) |
+| `task_metrics_mode=local_fixture`; `claims_downstream` only then | OK (`tasks.evaluate_local_fixture_suite`) |
+| PPL path unchanged (real NLL / synthetic smoke) | OK (`measure_perplexity`) |
+| Live soft-anneal one head; `anneal_mode=live_weight` vs `pattern_demo` | OK (`relax.live_soft_anneal`, gated hook) |
+| Wall-clock: never claim speedup without measured timings | OK (`efficiency.compare_wall_clock`, FakeModel CI) |
+| Hub-free P7 domain tests | OK (`tests/test_domain_p7_fixtures.py`) |
+
+Residual (scale): full Conv1D surgical module install for true post-removal wall-clock/PPL; licensed WikiText/LAMBADA streams.
+

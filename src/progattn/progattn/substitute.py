@@ -191,8 +191,13 @@ def _intervene_gpt2_style(
     program: str,
     head: int,
     n_heads: int,
+    gate: float = 1.0,
 ) -> Any:
-    """Rebuild attn_output via program pattern × values (affects logits)."""
+    """Rebuild attn_output via program pattern × values (affects logits).
+
+    ``gate`` in [0, 1] soft-blends learned attentions with the program pattern
+    on the target head (1.0 = full program replace).
+    """
     import torch
 
     split_size = int(getattr(module, "split_size", hidden_states.shape[-1]))
@@ -219,7 +224,11 @@ def _intervene_gpt2_style(
     if not (0 <= head < new_attns.shape[1]):
         return out
     t = _pattern_tensor(program, seq, device=new_attns.device, dtype=new_attns.dtype)
-    new_attns[:, head, :, :] = t.unsqueeze(0)
+    g = float(max(0.0, min(1.0, gate)))
+    learned = new_attns[:, head, :, :]
+    blended = (1.0 - g) * learned + g * t.unsqueeze(0)
+    blended = blended / blended.sum(dim=-1, keepdim=True).clamp_min(1e-8)
+    new_attns[:, head, :, :] = blended
 
     # context: [batch, heads, seq, head_dim] -> merge -> project
     context = torch.matmul(new_attns, value_states)
@@ -267,13 +276,20 @@ def _intervene_value_cache(
     return (merged, out[1], new_attns) + out[3:]
 
 
-def make_pattern_hook(program: str, head: int, n_heads: int) -> Callable[..., Any]:
+def make_pattern_hook(
+    program: str,
+    head: int,
+    n_heads: int,
+    *,
+    gate: float = 1.0,
+) -> Callable[..., Any]:
     """Executable pattern intervention for GPT-2-style attention modules.
 
     Replaces the probabilities used for ``attn @ V`` (or rebuilds ``attn_output``
     from program pattern × values) so next-token logits change. Mutating only the
     debug attentions tensor is insufficient and is not used as the primary path.
 
+    ``gate`` soft-blends learned vs program on the target head (1.0 = full replace).
     This is MASKING / soft intervention, not parameter deletion.
     """
 
@@ -293,7 +309,9 @@ def make_pattern_hook(program: str, head: int, n_heads: int) -> Callable[..., An
             and hasattr(module, "c_attn")
             and hasattr(module, "c_proj")
         ):
-            return _intervene_gpt2_style(module, hidden, out, program, head, n_heads)
+            return _intervene_gpt2_style(
+                module, hidden, out, program, head, n_heads, gate=gate
+            )
 
         # Test / generic path: values cached on the module during forward.
         if getattr(module, "_progattn_values", None) is not None:
@@ -305,18 +323,71 @@ def make_pattern_hook(program: str, head: int, n_heads: int) -> Callable[..., An
             if torch.is_tensor(attns) and attns.dim() == 4 and 0 <= head < attns.shape[1]:
                 seq = int(attns.shape[-1])
                 new_attns = attns.clone()
-                new_attns[:, head, :, :] = _pattern_tensor(
+                t = _pattern_tensor(
                     program, seq, device=attns.device, dtype=attns.dtype
                 ).unsqueeze(0)
+                g = float(max(0.0, min(1.0, gate)))
+                blended = (1.0 - g) * new_attns[:, head, :, :] + g * t
+                blended = blended / blended.sum(dim=-1, keepdim=True).clamp_min(1e-8)
+                new_attns[:, head, :, :] = blended
                 return (out[0], out[1], new_attns) + out[3:]
         return out
 
     hook.program = program  # type: ignore[attr-defined]
     hook.head = head  # type: ignore[attr-defined]
     hook.n_heads = n_heads  # type: ignore[attr-defined]
+    hook.gate = float(gate)  # type: ignore[attr-defined]
     hook.intervention_kind = "masking_not_removal"  # type: ignore[attr-defined]
     hook.executable = True  # type: ignore[attr-defined]
     return hook
+
+
+def gated_pattern_next_token_kl(
+    *,
+    runtime: Any,
+    layer: int,
+    head: int,
+    program: str,
+    gate: float,
+    text: str,
+    n_heads: int,
+) -> dict[str, Any]:
+    """Next-token KL(clean || gated-blend) on an already-loaded runtime."""
+    import torch
+    import torch.nn.functional as F
+
+    model = runtime.model
+    tok = runtime.tokenizer
+    enc = tok(text, return_tensors="pt")
+    enc = {k: v.to(runtime.device) for k, v in enc.items()}
+
+    with torch.no_grad():
+        clean = model(**enc, output_attentions=True)
+        clean_logits = clean.logits[0, -1].float()
+        clean_p = F.softmax(clean_logits, dim=-1)
+
+    block = None
+    if hasattr(model, "transformer") and hasattr(model.transformer, "h"):
+        block = model.transformer.h[layer].attn
+    elif hasattr(model, "model") and hasattr(model.model, "layers"):
+        block = getattr(model.model.layers[layer], "self_attn", None)
+    if block is None:
+        return {"next_token_kl": float("nan"), "gate": float(gate)}
+
+    handle = block.register_forward_hook(
+        make_pattern_hook(program, head, n_heads, gate=gate)
+    )
+    try:
+        with torch.no_grad():
+            intervened = model(**enc, output_attentions=True)
+            int_logits = intervened.logits[0, -1].float()
+            int_p = F.softmax(int_logits, dim=-1)
+    finally:
+        handle.remove()
+
+    eps = 1e-8
+    kl = float(torch.sum(clean_p * (torch.log(clean_p + eps) - torch.log(int_p + eps))).item())
+    return {"next_token_kl": kl, "gate": float(gate), "kl_space": "next_token"}
 
 
 def mask_attention_head_probs(

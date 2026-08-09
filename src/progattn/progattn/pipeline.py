@@ -9,9 +9,9 @@ import numpy as np
 from omegaconf import DictConfig
 
 from ._util import ensure_dir, read_json, stage_result, write_json
-from .efficiency import efficiency_report
+from .efficiency import efficiency_report, measure_forward_wall_clock
 from .patterns import generate_pattern
-from .relax import compare_relaxations
+from .relax import compare_relaxations, live_soft_anneal
 from .schedule import greedy_schedule
 from .substitute import collect_model_attentions, synthetic_clean_patterns
 from .surgery import demo_surgery, live_gpt2_surgery
@@ -156,7 +156,20 @@ def stage_fit(cfg: DictConfig, run_dir: Path) -> dict[str, Any]:
     p = np.asarray(clean["patterns"][key], dtype=np.float64)
     q = generate_pattern("previous_token", clean["seq_len"])
     s = min(p.shape[0], q.shape[0])
-    relax = compare_relaxations(p[:s, :s], q[:s, :s], steps=10)
+    # One-head live soft-anneal when measured; smoke stays pattern_demo.
+    anneal_head = int(converted[0]) if converted else 0
+    if force:
+        relax = compare_relaxations(p[:s, :s], q[:s, :s], steps=10)
+    else:
+        relax = live_soft_anneal(
+            model_name=_model_name(cfg),
+            revision=_revision(cfg),
+            layer=0,
+            head=anneal_head % max(1, int(clean["n_heads"])),
+            program="previous_token",
+            steps=5,
+            force_synthetic=False,
+        )
     out = ensure_dir(run_dir / "artifacts" / "fit")
     write_json(
         out / "e01.json",
@@ -174,7 +187,8 @@ def stage_fit(cfg: DictConfig, run_dir: Path) -> dict[str, Any]:
         "surgery_kind": surgery.get("surgery_kind", "structural_removal"),
         "surgery_equivalent": surgery["equivalence"]["equivalent"],
         "masking_params_removed": surgery.get("masking_contrast", {}).get("params_removed", 0),
-        "soft_final_distance": relax["soft_final_distance"],
+        "soft_final_distance": relax.get("soft_final_distance"),
+        "anneal_mode": relax.get("anneal_mode", "pattern_demo"),
         "surgery_mode": surgery.get("mode"),
         "surgery_eval": surgery.get("surgery_eval"),
         "kl_space": e01.get("kl_space", e01["metrics"].get("kl_space", "pattern")),
@@ -190,12 +204,34 @@ def stage_evaluate(cfg: DictConfig, run_dir: Path) -> dict[str, Any]:
     force = _force_synthetic(cfg)
     schedule = read_json(run_dir / "artifacts" / "fit" / "schedule.json")
     surgery = read_json(run_dir / "artifacts" / "fit" / "surgery.json")
+    runtime = None
+    wall_before = None
+    wall_after = None
+    if not force:
+        try:
+            from .model_runtime import try_load_causal_lm
+
+            runtime = try_load_causal_lm(
+                _model_name(cfg), revision=_revision(cfg), force_synthetic=False
+            )
+        except Exception:  # noqa: BLE001
+            runtime = None
+        if runtime is not None:
+            wall_before = measure_forward_wall_clock(runtime, reps=2, warmup=1)
+            # After: same model; structural slice claim uses params, not a second install.
+            # Microbench honesty: report measured before; after equals before unless
+            # a surgically narrowed module is installed (still residual). Stamp measured.
+            wall_after = dict(wall_before)
+            wall_after["note"] = (
+                "Post-surgery install not wired; after==before so claims_speedup stays false."
+            )
     tasks = evaluate_suite(
         schedule,
         seed=_seed(cfg),
         model_name=_model_name(cfg),
         revision=_revision(cfg),
         force_synthetic=force,
+        runtime=runtime,
     )
     eff = efficiency_report(
         params_before=surgery["params_before"],
@@ -203,6 +239,8 @@ def stage_evaluate(cfg: DictConfig, run_dir: Path) -> dict[str, Any]:
         n_heads=int(read_json(run_dir / "artifacts" / "collect" / "clean_patterns.json")["n_heads"]),
         converted=len(surgery["converted_heads"]),
         surgery_kind=str(surgery.get("surgery_kind", "structural_removal")),
+        wall_clock_before=wall_before,
+        wall_clock_after=wall_after,
     )
     out = ensure_dir(run_dir / "artifacts" / "evaluate")
     write_json(out / "tasks.json", tasks)
@@ -212,6 +250,9 @@ def stage_evaluate(cfg: DictConfig, run_dir: Path) -> dict[str, Any]:
         "param_reduction_frac": eff["param_reduction_frac"],
         "qk_flops": eff["flops"]["qk_flops"],
         "claims_parameter_reduction": eff["claims_parameter_reduction"],
+        "claims_speedup": eff.get("claims_speedup", False),
+        "claims_downstream": bool(tasks.get("claims_downstream", False)),
+        "task_metrics_mode": tasks.get("task_metrics_mode", "proxy"),
         "surgery_kind": eff["surgery_kind"],
     }
     payload = stage_result(task="evaluate", seed=_seed(cfg), n=schedule["n_replaced"], metrics=metrics)
@@ -231,9 +272,14 @@ def stage_report(cfg: DictConfig, run_dir: Path) -> dict[str, Any]:
         "params_removed": fit["metrics"].get("params_removed"),
         "masking_params_removed": fit["metrics"].get("masking_params_removed"),
         "surgery_kind": fit["metrics"].get("surgery_kind"),
+        "anneal_mode": fit["metrics"].get("anneal_mode"),
+        "claims_downstream": ev["metrics"].get("claims_downstream"),
+        "task_metrics_mode": ev["metrics"].get("task_metrics_mode"),
+        "claims_speedup": ev["metrics"].get("claims_speedup"),
         "note": (
             "E01 gates later stages; masking is never reported as parameter removal; "
-            "structural fused-QKV surgery counts real Q/K column deletion."
+            "structural fused-QKV surgery counts real Q/K column deletion; "
+            "downstream claims require local_fixture mode; speedup requires measured timings."
         ),
     }
     out = ensure_dir(run_dir / "artifacts" / "report")
