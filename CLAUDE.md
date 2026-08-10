@@ -1,10 +1,10 @@
-# Build instructions
+# Attention Heads That Collapse to Tiny Programs
 
 Context for coding agents working in this repository.
 
 ## What this is
 
-Research implementation of "Replacing Attention Heads With Programs You Can Actually Delete".
+Research implementation of "Attention Heads That Collapse to Tiny Programs".
 
 ## Hard constraints
 

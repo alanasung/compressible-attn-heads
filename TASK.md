@@ -1,4 +1,4 @@
-# TASK.md — Replacing Attention Heads With Programs You Can Actually Delete
+# Attention Heads That Collapse to Tiny Programs
 
 ID convention: `I##` infrastructure, `D##` data, `M##` modelling / hooks,
 `E##` experiments, `A##` ablations, `S##` sweeps, `R##` reporting.

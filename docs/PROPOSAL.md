@@ -1,6 +1,5 @@
-# Replacing Attention Heads With Programs You Can Actually Delete
+# Attention Heads That Collapse to Tiny Programs
 
-**Target project.** Replacing Attention Heads With Programs You Can Actually Delete
 **Research areas.** Mechanistic interpretability
 
 ## Summary
@@ -9,7 +8,7 @@ Rank every attention head by how cheaply it can be replaced with a hand-written 
 
 ## Hypothesis
 
-Head substitutability is heavy-tailed and predictable, and more importantly it survives deployment: heads identified as substitutable can have their Q and K projections physically deleted and be retrained with a fixed programmatic pattern, recovering most of the perplexity cost that hard post-hoc substitution incurs, while genuinely reducing parameters rather than merely masking a still-computed pattern.
+Many attention heads are well approximated by short programs; the open question is whether that approximation supports reclaiming Q/K compute rather than only masking patterns.
 
 A hypothesis worth testing has to be able to lose. This one loses if the
 measurements below come back null, and the design is built so that a null is
@@ -27,7 +26,7 @@ reportable rather than a dead end.
 1. Load a small pretrained Transformer and cache clean attention patterns.
 2. Implement a library of programmatic pattern generators.
 3. Sweep every (head, program) pair, measuring KL and downstream accuracy.
-4. Build the substitutability ladder and a greedy replacement schedule.
+4. Build a program-match ranking and a greedy replacement schedule.
 5. Fine-tune under two differentiable relaxations, soft-blend and straight-through, and compare against hard substitution.
 6. Anneal the blend gate to zero and then physically remove the Q and K projections for converted heads, reporting the parameter reduction and the perplexity cost of true removal.
 7. Record wall-clock and FLOP deltas so the efficiency claim is measured rather than assumed.

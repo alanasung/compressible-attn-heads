@@ -1,9 +1,9 @@
-# Repository guide
+# Attention Heads That Collapse to Tiny Programs
 
 See [CLAUDE.md](CLAUDE.md) for the full build instructions; this file exists so
 that agents which look for `AGENTS.md` find the same context.
 
-Project: Replacing Attention Heads With Programs You Can Actually Delete
+Project: Attention Heads That Collapse to Tiny Programs
 Package: `src/progattn`
 Entry point: `python -m progattn --help`
 

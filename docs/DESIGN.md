@@ -1,14 +1,14 @@
-# Design Document: Replacing Attention Heads With Programs You Can Actually Delete
+# Attention Heads That Collapse to Tiny Programs — design
 
 ## 1. Purpose
 
-This document is the method contract for **Replacing Attention Heads With Programs You Can Actually Delete**. It specifies what is
+This document is the method contract for **Attention Heads That Collapse to Tiny Programs**. It specifies what is
 measured, how measurement is instrumented, which artifacts are produced, and
 which claims are out of scope for the pilot profile.
 
 One-liner: Rank every attention head by how cheaply it can be replaced with a hand-written program, then make that substitution survive training.
 
-Hypothesis: Many attention heads are well approximated by short programs; the interesting claim is whether those programs can replace Q/K compute rather than merely mask it.
+Hypothesis: Many attention heads are well approximated by short programs; the open question is whether that approximation supports reclaiming Q/K compute rather than only masking patterns.
 
 ## 2. Scope
 
@@ -256,7 +256,7 @@ Run `python orchestration/scaffold2.py` from the meta-repo root after template e
 
 Run `python orchestration/scaffold2.py` from the meta-repo root after template edits.
 
-## 23. Domain methodology: Substitutability Ladder
+## 23. Domain methodology: Program-compressible heads
 
 ### E01 gate
 

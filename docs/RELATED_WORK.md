@@ -1,12 +1,12 @@
 # Related work
 
-This note situates **Replacing Attention Heads With Programs You Can Actually Delete** against related literature.
+This note situates **Attention Heads That Collapse to Tiny Programs** against related literature.
 
 ## Positioning
 
 Rank every attention head by how cheaply it can be replaced with a hand-written program, then make that substitution survive training.
 
-The design hypothesis is: Head substitutability is heavy-tailed and predictable, and more importantly it survives deployment: heads identified as substitutable can have their Q and K projections physically deleted and be retrained with a fixed programmatic pattern, recovering most of the perplexity cost that hard post-hoc substitution incurs, while genuinely reducing parameters rather than merely masking a still-computed pattern.
+The design hypothesis is: Many attention heads are well approximated by short programs; the open question is whether that approximation supports reclaiming Q/K compute rather than only masking patterns.
 
 ## Engagement rules
 

@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "progattn"
 version = "0.1.0"
-description = "Substitute attention heads with programs and remove the unused Q/K weights."
+description = "Match attention heads to short programs and account for reclaimable Q/K weights."
 readme = "README.md"
 requires-python = ">=3.10,<3.13"
 license = { text = "MIT" }

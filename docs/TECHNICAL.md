@@ -1,4 +1,4 @@
-# Technical appendix
+# Attention Heads That Collapse to Tiny Programs
 
 ## A1. Technical note 1
 

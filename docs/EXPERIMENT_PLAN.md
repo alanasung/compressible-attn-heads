@@ -1,4 +1,4 @@
-# Experiment plan
+# Experiment plan — Attention Heads That Collapse to Tiny Programs
 
 Stage-by-stage design. Each stage is registered in `src/progattn/stages.py`
 and appears in `python -m progattn stages`.

@@ -2,7 +2,7 @@
 
 ## Codex GPT-5 Sol (p4)
 - Verdict: MINOR_DRIFT
-- Summary: Tightly aligned with deploying programmatic QK circuits and native interpretability; fixable gaps around training-efficiency measurement, relaxation failure-mode documentation completeness, and explicit update criteria (those live in `projects.py`).
+- Summary: Tightly aligned with program-compressible attention and weight-reclaim accounting; fixable gaps around training-efficiency measurement, relaxation failure-mode documentation completeness, and explicit update criteria (those live in `projects.py`).
 - Detail: `orchestration/out/align/programmatic-attention.json`
 
 ## Grok (p4 dual)

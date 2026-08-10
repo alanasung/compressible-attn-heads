@@ -1,15 +1,15 @@
 <p align="center">
-  <h1 align="center">Replacing Attention Heads With Programs You Can Actually Delete</h1>
-  <p align="center"><strong>Find heads whose patterns match simple programs, then surgically remove their Q/K weights and keep the model usable.</strong></p>
+  <h1 align="center">Attention Heads That Collapse to Tiny Programs</h1>
+  <p align="center"><strong>Find heads whose patterns match short programs, intervene on them, and account for what weight deletion would reclaim.</strong></p>
   </p>
 
 ---
 
 ## Overview
 
-This repository implements experimental profiles for **Replacing Attention Heads With Programs You Can Actually Delete**. Config, caching, hooks, metrics, ablations, reporting, and CI are built for reproducible local pilots on small open-weight models.
+This repository implements experimental profiles for **Attention Heads That Collapse to Tiny Programs**. Config, caching, hooks, metrics, ablations, reporting, and CI are built for reproducible local pilots on small open-weight models.
 
-Hypothesis (one line): Many attention heads are well approximated by short programs; the interesting claim is whether those programs can replace Q/K compute rather than merely mask it.
+Hypothesis (one line): Many attention heads are well approximated by short programs; the open question is whether that approximation supports reclaiming Q/K compute rather than only masking patterns.
 
 ## Motivation
 
@@ -76,8 +76,7 @@ private data. Synthetic harness-validation outputs are labelled
 
 ## Status
 
-Shared spine is in place. Domain-specific stages land behind the experiment
-registry and must pass the harness-validation script before any measured claim.
+Focus: program-compressible attention and weight reclaim accounting. Shared infrastructure is in place; domain stages must pass harness validation before any measured claim.
 
 ## Related work
 
@@ -87,7 +86,7 @@ registry and must pass the harness-validation script before any measured claim.
 
 ```bibtex
 @misc{deletable_program_heads,
-  title        = {Replacing Attention Heads With Programs You Can Actually Delete},
+  title        = {Attention Heads That Collapse to Tiny Programs},
   author       = {Alana Sung},
   year         = {2026},
   howpublished = {Technical report},
